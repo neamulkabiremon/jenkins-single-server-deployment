@@ -24,13 +24,13 @@ pipeline {
                 set -e
                 which python3 || exit 1
                 which pip || exit 1
-                
+
                 # Create virtual environment if not exists
                 if [ ! -d "$VENV_DIR" ]; then
                     python3 -m venv $VENV_DIR
                 fi
-                
-                # Use . instead of source for activation
+
+                # Activate virtual environment
                 . $VENV_DIR/bin/activate
 
                 # Upgrade pip
@@ -74,14 +74,4 @@ pipeline {
                         unzip -o /home/ec2-user/myapp.zip -d /home/ec2-user/app/
                         cd /home/ec2-user/app/
 
-                        # Use . instead of source for activation
-                        . venv/bin/activate
-
-                        # Ensure dependencies are installed
-                        pip install -r requirements.txt
-
-                        # Restart service
-                        sudo systemctl restart flaskapp.service
-EOF
-                    '''
-              
+   
