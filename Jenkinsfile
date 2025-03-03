@@ -21,7 +21,7 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                set -e  # Exit immediately if a command exits with a non-zero status
+                set -e  # Exit immediately if a command fails
                 which python3 || exit 1
                 which pip || exit 1
 
@@ -31,12 +31,10 @@ pipeline {
                 fi
 
                 # Activate virtual environment
-                . $VENV_DIR/bin/activate
+                source $VENV_DIR/bin/activate
 
-                # Upgrade pip
+                # Upgrade pip and install dependencies
                 pip install --upgrade pip
-
-                # Install dependencies
                 pip install -r requirements.txt
                 '''
             }
@@ -46,7 +44,7 @@ pipeline {
             steps {
                 sh '''
                 set -e
-                . $VENV_DIR/bin/activate
+                source $VENV_DIR/bin/activate
                 pip install pytest  # Ensure pytest is installed
                 pytest  # Run tests
                 '''
@@ -75,7 +73,7 @@ pipeline {
                         cd /home/ec2-user/app/
 
                         # Activate virtual environment
-                        . venv/bin/activate
+                        source venv/bin/activate
 
                         # Ensure dependencies are installed
                         pip install -r requirements.txt
@@ -87,6 +85,14 @@ EOF
                 }
             }
         }
-    }
+    }  // <-- This was missing or misaligned in your original script
 
-    pos
+    post {
+        success {
+            echo "✅ Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check logs for errors."
+        }
+    }
+}  // <-- Ensures that the pipeline block is closed properly
