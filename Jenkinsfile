@@ -20,6 +20,7 @@ pipeline {
             steps {
                 sh "zip -r myapp.zip ./* -x '*.git*'"
                 sh "ls -lart"
+                echo "testing"
             }
         }
 
