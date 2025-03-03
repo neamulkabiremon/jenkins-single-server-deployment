@@ -9,14 +9,14 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                # Ensure required system packages are installed
+                echo "Updating system packages..."
                 sudo apt update -y
                 sudo apt install -y zip python3 python3-pip || true
 
-                # Ensure pip is upgraded
+                echo "Upgrading pip..."
                 pip install --upgrade pip
 
-                # Install dependencies
+                echo "Installing required dependencies..."
                 pip install --user -r requirements.txt
                 '''
             }
@@ -25,14 +25,14 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                # Ensure pytest is installed
+                echo "Checking if pytest is installed..."
                 if ! command -v pytest &> /dev/null
                 then
                     echo "pytest not found, installing..."
                     pip install --user pytest || true
                 fi
 
-                # Run tests with full path
+                echo "Running tests..."
                 ~/.local/bin/pytest || true
                 '''
             }
@@ -41,33 +41,55 @@ pipeline {
         stage('Package code') {
             steps {
                 sh '''
-                # Ensure zip is installed
+                echo "Checking if zip is installed..."
                 if ! command -v zip &> /dev/null
                 then
                     echo "zip not found, installing..."
                     sudo apt install -y zip
                 fi
 
-                # Create deployment package
+                echo "Creating deployment package..."
                 zip -r myapp.zip ./* -x '*.git*'
+
+                echo "Listing package contents..."
                 ls -lart
                 '''
-                echo "Package created successfully"
+                echo "✅ Package created successfully"
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key', keyFileVariable: 'MY_SSH_KEY', usernameVariable: 'username')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key', keyFileVariable: 'MY_SSH_KEY')]) {
                     sh '''
-                    scp -i $MY_SSH_KEY -o StrictHostKeyChecking=no myapp.zip  ${username}@${SERVER_IP}:/home/ec2-user/
-                    ssh -i $MY_SSH_KEY -o StrictHostKeyChecking=no ${username}@${SERVER_IP} << EOF
-                        unzip -o /home/ec2-user/myapp.zip -d /home/ec2-user/app/
-                        source app/venv/bin/activate
-                        cd /home/ec2-user/app/
+                    echo "Transferring package to the remote server..."
+                    scp -i $MY_SSH_KEY -o StrictHostKeyChecking=no myapp.zip ubuntu@${SERVER_IP}:/home/ubuntu/
+
+                    echo "Connecting to the remote server and deploying..."
+                    ssh -i $MY_SSH_KEY -o StrictHostKeyChecking=no ubuntu@${SERVER_IP} << 'EOF'
+                        echo "Preparing deployment on remote server..."
+
+                        echo "Creating app directory if not exists..."
+                        mkdir -p /home/ubuntu/app
+
+                        echo "Extracting package..."
+                        unzip -o /home/ubuntu/myapp.zip -d /home/ubuntu/app/
+
+                        echo "Setting up virtual environment..."
+                        python3 -m venv /home/ubuntu/app/venv
+
+                        echo "Activating virtual environment..."
+                        source /home/ubuntu/app/venv/bin/activate
+
+                        echo "Installing dependencies..."
+                        cd /home/ubuntu/app/
                         pip install -r requirements.txt
+
+                        echo "Restarting Flask service..."
                         sudo systemctl restart flaskapp.service
-EOF
+
+                        echo "✅ Deployment completed successfully!"
+                    EOF
                     '''
                 }
             }
