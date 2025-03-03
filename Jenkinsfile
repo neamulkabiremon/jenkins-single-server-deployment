@@ -21,7 +21,7 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                set -e
+                set -e  # Exit immediately if a command exits with a non-zero status
                 which python3 || exit 1
                 which pip || exit 1
 
@@ -48,7 +48,7 @@ pipeline {
                 set -e
                 . $VENV_DIR/bin/activate
                 pip install pytest  # Ensure pytest is installed
-                python3 -m pytest  # Run tests
+                pytest  # Run tests
                 '''
             }
         }
@@ -74,4 +74,19 @@ pipeline {
                         unzip -o /home/ec2-user/myapp.zip -d /home/ec2-user/app/
                         cd /home/ec2-user/app/
 
-   
+                        # Activate virtual environment
+                        . venv/bin/activate
+
+                        # Ensure dependencies are installed
+                        pip install -r requirements.txt
+
+                        # Restart service
+                        sudo systemctl restart flaskapp.service
+EOF
+                    '''
+                }
+            }
+        }
+    }
+
+    pos
