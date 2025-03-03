@@ -85,7 +85,7 @@ EOF
                 }
             }
         }
-    }  // <-- This was missing or misaligned in your original script
+    }  
 
     post {
         success {
@@ -95,4 +95,4 @@ EOF
             echo "❌ Pipeline failed. Check logs for errors."
         }
     }
-}  // <-- Ensures that the pipeline block is closed properly
+}  
