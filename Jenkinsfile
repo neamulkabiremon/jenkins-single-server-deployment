@@ -9,11 +9,15 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                # Ensure pip is up to date
+                # Ensure required system packages are installed
+                sudo apt update -y
+                sudo apt install -y zip python3 python3-pip || true
+
+                # Ensure pip is upgraded
                 pip install --upgrade pip
-                
+
                 # Install dependencies
-                pip install -r requirements.txt
+                pip install --user -r requirements.txt
                 '''
             }
         }
@@ -25,20 +29,30 @@ pipeline {
                 if ! command -v pytest &> /dev/null
                 then
                     echo "pytest not found, installing..."
-                    pip install pytest || true
+                    pip install --user pytest || true
                 fi
-                
-                # Run tests
-                pytest || true
+
+                # Run tests with full path
+                ~/.local/bin/pytest || true
                 '''
             }
         }
 
         stage('Package code') {
             steps {
-                sh "zip -r myapp.zip ./* -x '*.git*'"
-                sh "ls -lart"
-                echo "testing"
+                sh '''
+                # Ensure zip is installed
+                if ! command -v zip &> /dev/null
+                then
+                    echo "zip not found, installing..."
+                    sudo apt install -y zip
+                fi
+
+                # Create deployment package
+                zip -r myapp.zip ./* -x '*.git*'
+                ls -lart
+                '''
+                echo "Package created successfully"
             }
         }
 
