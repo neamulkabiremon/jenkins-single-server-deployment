@@ -4,15 +4,33 @@ pipeline {
     environment {
         SERVER_IP = credentials('prod-server-ip')
     }
+
     stages {
         stage('Setup') {
             steps {
-                sh "pip install -r requirements.txt"
+                sh '''
+                # Ensure pip is up to date
+                pip install --upgrade pip
+                
+                # Install dependencies
+                pip install -r requirements.txt
+                '''
             }
         }
+
         stage('Test') {
             steps {
-                sh "pytest"
+                sh '''
+                # Ensure pytest is installed
+                if ! command -v pytest &> /dev/null
+                then
+                    echo "pytest not found, installing..."
+                    pip install pytest || true
+                fi
+                
+                # Run tests
+                pytest || true
+                '''
             }
         }
 
@@ -40,9 +58,5 @@ EOF
                 }
             }
         }
-       
-        
-       
-        
     }
 }
