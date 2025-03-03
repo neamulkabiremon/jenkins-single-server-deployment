@@ -8,7 +8,12 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/neamulkabiremon/jenkins-single-server-deployment.git'
+                script {
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: '*/main']],  // Change "main" if your branch is different
+                        userRemoteConfigs: [[url: 'https://github.com/neamulkabiremon/jenkins-single-server-deployment.git']]
+                    ])
+                }
             }
         }
 
