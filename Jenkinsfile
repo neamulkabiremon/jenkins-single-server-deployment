@@ -21,9 +21,7 @@ pipeline {
                 fi
 
                 echo "📦 Activating virtual environment and installing dependencies..."
-                source $VENV_DIR/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
+                . $VENV_DIR/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
                 '''
             }
         }
@@ -33,9 +31,7 @@ pipeline {
                 sh '''
                 set -e
                 echo "🧪 Running tests..."
-                source $VENV_DIR/bin/activate
-                pip install pytest  # Ensure pytest is installed
-                pytest || { echo "❌ Tests failed!"; exit 1; }
+                . $VENV_DIR/bin/activate && pip install pytest && pytest
                 '''
             }
         }
@@ -72,11 +68,7 @@ pipeline {
                         if [ ! -d "venv" ]; then
                             python3 -m venv venv
                         fi
-                        source venv/bin/activate
-
-                        # Ensure dependencies are installed
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
+                        . venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
 
                         # Restart the Flask app service
                         sudo systemctl restart flaskapp.service
