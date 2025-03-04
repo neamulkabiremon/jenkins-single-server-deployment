@@ -3,25 +3,37 @@ pipeline {
 
     environment {
         SERVER_IP = credentials('prod-server-ip')  // Jenkins Secret Text Credential
-        VENV_DIR = "venv"
     }
 
     stages {
+        stage('Checkout Code') {
+            steps {
+                script {
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[url: 'https://github.com/neamulkabiremon/jenkins-single-server-deployment.git']]
+                    ])
+                }
+            }
+        }
+
         stage('Setup') {
             steps {
                 sh '''
                 set -e
                 echo "🔧 Checking Python and Pip installation..."
-                which python3 || { echo "❌ Python3 not found!"; exit 1; }
-                which pip || { echo "❌ Pip not found!"; exit 1; }
+                which python3 || exit 1
+                which pip || exit 1
 
                 echo "🐍 Setting up virtual environment..."
-                if [ ! -d "$VENV_DIR" ]; then
-                    python3 -m venv $VENV_DIR
+                if [ ! -d "venv" ]; then
+                    python3 -m venv venv
                 fi
 
                 echo "📦 Activating virtual environment and installing dependencies..."
-                . $VENV_DIR/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
                 '''
             }
         }
@@ -31,7 +43,9 @@ pipeline {
                 sh '''
                 set -e
                 echo "🧪 Running tests..."
-                . $VENV_DIR/bin/activate && pip install pytest && pytest
+                . venv/bin/activate
+                pip install pytest  # Ensure pytest is installed
+                pytest
                 '''
             }
         }
@@ -41,7 +55,7 @@ pipeline {
                 sh '''
                 set -e
                 echo "📦 Packaging application..."
-                zip -r myapp.zip ./* -x '*.git*' "$VENV_DIR/*"
+                zip -r myapp.zip . -x "*.git*" "venv/*"
                 ls -lart
                 '''
             }
@@ -68,7 +82,31 @@ pipeline {
                         if [ ! -d "venv" ]; then
                             python3 -m venv venv
                         fi
-                        . venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+                        . venv/bin/activate
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
+
+                        # Ensure systemd service exists
+                        SERVICE_FILE="/etc/systemd/system/flaskapp.service"
+                        if [ ! -f "$SERVICE_FILE" ]; then
+                            echo "⚠️ Service file not found. Creating flaskapp.service..."
+                            sudo bash -c 'cat > /etc/systemd/system/flaskapp.service << EOL
+[Unit]
+Description=Flask Application
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/app
+ExecStart=/home/ec2-user/app/venv/bin/python /home/ec2-user/app/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL'
+                            sudo systemctl daemon-reload
+                            sudo systemctl enable flaskapp.service
+                        fi
 
                         # Restart the Flask app service
                         sudo systemctl restart flaskapp.service
