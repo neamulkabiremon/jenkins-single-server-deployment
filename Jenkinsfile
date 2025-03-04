@@ -3,61 +3,23 @@ pipeline {
 
     environment {
         SERVER_IP = credentials('prod-server-ip')
-        VENV_DIR = "venv"
     }
-
     stages {
-        stage('Checkout Code') {
-            steps {
-                script {
-                    checkout([$class: 'GitSCM',
-                        branches: [[name: '*/main']],
-                        userRemoteConfigs: [[url: 'https://github.com/neamulkabiremon/jenkins-single-server-deployment.git']]
-                    ])
-                }
-            }
-        }
-
         stage('Setup') {
             steps {
-                sh '''
-                set -e  # Exit immediately if a command fails
-                which python3 || exit 1
-                which pip || exit 1
-
-                # Create virtual environment if not exists
-                if [ ! -d "$VENV_DIR" ]; then
-                    python3 -m venv $VENV_DIR
-                fi
-
-                # Activate virtual environment
-                source $VENV_DIR/bin/activate
-
-                # Upgrade pip and install dependencies
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                '''
+                sh "pip install -r requirements.txt"
             }
         }
-
         stage('Test') {
             steps {
-                sh '''
-                set -e
-                source $VENV_DIR/bin/activate
-                pip install pytest  # Ensure pytest is installed
-                pytest  # Run tests
-                '''
+                sh "pytest"
             }
         }
 
-        stage('Package Code') {
+        stage('Package code') {
             steps {
-                sh '''
-                set -e
-                zip -r myapp.zip . -x "*.git*" "$VENV_DIR/*"
-                ls -lart
-                '''
+                sh "zip -r myapp.zip ./* -x '*.git*'"
+                sh "ls -lart"
             }
         }
 
@@ -65,34 +27,21 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key', keyFileVariable: 'MY_SSH_KEY', usernameVariable: 'username')]) {
                     sh '''
-                    set -e
-                    scp -i $MY_SSH_KEY -o StrictHostKeyChecking=no myapp.zip ${username}@${SERVER_IP}:/home/ec2-user/
+                    scp -i $MY_SSH_KEY -o StrictHostKeyChecking=no myapp.zip  ${username}@${SERVER_IP}:/home/ec2-user/
                     ssh -i $MY_SSH_KEY -o StrictHostKeyChecking=no ${username}@${SERVER_IP} << EOF
-                        set -e
                         unzip -o /home/ec2-user/myapp.zip -d /home/ec2-user/app/
+                        source app/venv/bin/activate
                         cd /home/ec2-user/app/
-
-                        # Activate virtual environment
-                        source venv/bin/activate
-
-                        # Ensure dependencies are installed
                         pip install -r requirements.txt
-
-                        # Restart service
                         sudo systemctl restart flaskapp.service
 EOF
                     '''
                 }
             }
         }
-    }  
-
-    post {
-        success {
-            echo "✅ Pipeline executed successfully!"
-        }
-        failure {
-            echo "❌ Pipeline failed. Check logs for errors."
-        }
+       
+        
+       
+        
     }
-}  
+}
