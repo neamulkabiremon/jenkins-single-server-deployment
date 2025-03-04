@@ -3,41 +3,58 @@ pipeline {
 
     environment {
         SERVER_IP = credentials('prod-server-ip')  // Jenkins Secret Text Credential
+        VENV_DIR = "venv"
     }
 
     stages {
         stage('Setup') {
             steps {
-                sh """
+                sh '''
                 set -e
+                echo "🔧 Checking Python and Pip installation..."
+                which python3 || { echo "❌ Python3 not found!"; exit 1; }
+                which pip || { echo "❌ Pip not found!"; exit 1; }
+
+                echo "🐍 Setting up virtual environment..."
+                if [ ! -d "$VENV_DIR" ]; then
+                    python3 -m venv $VENV_DIR
+                fi
+
+                echo "📦 Activating virtual environment and installing dependencies..."
+                source $VENV_DIR/bin/activate
+                pip install --upgrade pip
                 pip install -r requirements.txt
-                """
+                '''
             }
         }
 
         stage('Test') {
             steps {
-                sh """
+                sh '''
                 set -e
-                pytest
-                """
+                echo "🧪 Running tests..."
+                source $VENV_DIR/bin/activate
+                pip install pytest  # Ensure pytest is installed
+                pytest || { echo "❌ Tests failed!"; exit 1; }
+                '''
             }
         }
 
         stage('Package Code') {
             steps {
-                sh """
+                sh '''
                 set -e
-                zip -r myapp.zip ./* -x '*.git*'
+                echo "📦 Packaging application..."
+                zip -r myapp.zip ./* -x '*.git*' "$VENV_DIR/*"
                 ls -lart
-                """
+                '''
             }
         }
 
         stage('Deploy to Prod') {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key', keyFileVariable: 'MY_SSH_KEY', usernameVariable: 'USERNAME')]) {
-                    sh """
+                    sh '''
                     set -e
                     echo "🚀 Deploying app to production server: $SERVER_IP"
 
@@ -52,19 +69,20 @@ pipeline {
                         cd /home/ec2-user/app/
 
                         # Setup virtual environment
-                        if [ ! -d 'venv' ]; then
+                        if [ ! -d "venv" ]; then
                             python3 -m venv venv
                         fi
-                        . venv/bin/activate  # Use '.' instead of 'source' for better compatibility
+                        source venv/bin/activate
 
-                        # Install dependencies
+                        # Ensure dependencies are installed
+                        pip install --upgrade pip
                         pip install -r requirements.txt
 
                         # Restart the Flask app service
                         sudo systemctl restart flaskapp.service
                         echo "✅ Deployment successful!"
 EOF
-                    """
+                    '''
                 }
             }
         }
